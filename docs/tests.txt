@@ -1,0 +1,16 @@
+00:00 +0: loading /workspace/jiachangcai_flutter/test/app_flow_test.dart
+00:00 +0: /workspace/jiachangcai_flutter/test/app_flow_test.dart: phone: login, buy, submit, complete and reorder
+00:01 +1: /workspace/jiachangcai_flutter/test/app_flow_test.dart: narrow phone: menu categories, quantity, profile and editor
+00:02 +2: /workspace/jiachangcai_flutter/test/app_flow_test.dart: tablet layout retains all navigation destinations
+00:02 +3: loading /workspace/jiachangcai_flutter/test/store_test.dart
+00:03 +3: /workspace/jiachangcai_flutter/test/store_test.dart: seed menu is complete and does not duplicate after restart
+00:03 +4: /workspace/jiachangcai_flutter/test/store_test.dart: integer money avoids floating point errors and validates prices
+00:03 +5: /workspace/jiachangcai_flutter/test/store_test.dart: checkout snapshots current prices, preserves remark, empties cart
+00:03 +6: /workspace/jiachangcai_flutter/test/store_test.dart: off shelf and deleted items are excluded, never submitted
+00:03 +7: /workspace/jiachangcai_flutter/test/store_test.dart: terminal orders cannot transition; reorder filters deleted dishes
+00:03 +8: /workspace/jiachangcai_flutter/test/store_test.dart: cart, remark and orders are isolated per identity and survive logout
+00:03 +9: /workspace/jiachangcai_flutter/test/store_test.dart: category safety, duplicates, and dish validation
+00:03 +10: /workspace/jiachangcai_flutter/test/store_test.dart: queued writes preserve latest cart and remark after restart
+00:03 +11: /workspace/jiachangcai_flutter/test/store_test.dart: cancel order and preserve terminal status after reload
+00:03 +12: /workspace/jiachangcai_flutter/test/store_test.dart: corrupt storage is reported and never overwritten with seeds
+00:03 +13: All tests passed!

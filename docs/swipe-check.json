@@ -1,0 +1,23 @@
+{
+  "checks": [
+    "swipe left changes tab and nav highlight",
+    "second swipe advances to cart",
+    "swipe right goes back",
+    "tapping a destination still works after swiping",
+    "vertical drag inside a page does not switch tabs",
+    "home category tile scrolls the menu to that category"
+  ],
+  "pageErrors": [],
+  "failedRequests": [],
+  "steps": [
+    "login -> home",
+    "initial selected tab = '首页'",
+    "after swipe left #1: selected='点餐' menuContentVisible=False",
+    "after swipe left #2: selected='购物车'",
+    "after swipe right: selected='点餐'",
+    "after tapping 我的: selected='我的'",
+    "after vertical drag on home: selected='首页'",
+    "after tapping last category tile: selected='点餐'",
+    "last-category dish bounding box = {'x': 340, 'y': 459, 'width': 30, 'height': 30}"
+  ]
+}

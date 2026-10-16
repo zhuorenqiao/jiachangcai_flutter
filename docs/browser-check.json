@@ -1,0 +1,12 @@
+{
+  "checks": [
+    "login and home",
+    "cart add and live total",
+    "checkout and pending order",
+    "complete and reorder",
+    "reload restores session and cart",
+    "profile and dish management"
+  ],
+  "pageErrors": [],
+  "failedRequests": []
+}

@@ -1,0 +1,207 @@
+{
+  "categories": [
+    {
+      "id": "c1",
+      "name": "荤菜热炒",
+      "sort": 1
+    },
+    {
+      "id": "c2",
+      "name": "素菜时蔬",
+      "sort": 2
+    },
+    {
+      "id": "c3",
+      "name": "汤羹炖品",
+      "sort": 3
+    },
+    {
+      "id": "c4",
+      "name": "主食米饭",
+      "sort": 4
+    },
+    {
+      "id": "c5",
+      "name": "饮品甜点",
+      "sort": 5
+    }
+  ],
+  "dishes": [
+    {
+      "id": "d101",
+      "cat": "c1",
+      "name": "红烧肉",
+      "desc": "五花肉慢火红烧，肥而不腻，下饭首选",
+      "price": 38,
+      "img": "hongshaorou",
+      "sales": 326,
+      "featured": true,
+      "sort": 1
+    },
+    {
+      "id": "d102",
+      "cat": "c1",
+      "name": "农家小炒肉",
+      "desc": "青椒与五花肉大火快炒，鲜辣香嫩",
+      "price": 32,
+      "img": "xiaochaorou",
+      "sales": 512,
+      "featured": true,
+      "sort": 2
+    },
+    {
+      "id": "d103",
+      "cat": "c1",
+      "name": "糖醋里脊",
+      "desc": "外酥里嫩，酸甜适口",
+      "price": 36,
+      "img": "tangculiji",
+      "sales": 268,
+      "featured": false,
+      "sort": 3
+    },
+    {
+      "id": "d104",
+      "cat": "c1",
+      "name": "梅菜扣肉",
+      "desc": "梅干菜与肉片同蒸，酱香浓郁",
+      "price": 40,
+      "img": "meicaikourou",
+      "sales": 189,
+      "featured": false,
+      "sort": 4
+    },
+    {
+      "id": "d201",
+      "cat": "c2",
+      "name": "蒜蓉西兰花",
+      "desc": "蒜香清甜，爽脆解腻",
+      "price": 18,
+      "img": "xilanhua",
+      "sales": 244,
+      "featured": false,
+      "sort": 1
+    },
+    {
+      "id": "d202",
+      "cat": "c2",
+      "name": "地三鲜",
+      "desc": "土豆、茄子、青椒，酱香下饭",
+      "price": 22,
+      "img": "disansan",
+      "sales": 197,
+      "featured": false,
+      "sort": 2
+    },
+    {
+      "id": "d203",
+      "cat": "c2",
+      "name": "酸辣土豆丝",
+      "desc": "酸辣开胃，国民下饭菜",
+      "price": 16,
+      "img": "tudousi",
+      "sales": 231,
+      "featured": false,
+      "sort": 3
+    },
+    {
+      "id": "d301",
+      "cat": "c3",
+      "name": "番茄鸡蛋汤",
+      "desc": "酸甜暖胃，简单舒服",
+      "price": 14,
+      "img": "fanqiedantang",
+      "sales": 305,
+      "featured": false,
+      "sort": 1
+    },
+    {
+      "id": "d302",
+      "cat": "c3",
+      "name": "玉米排骨汤",
+      "desc": "文火慢炖，汤鲜肉嫩",
+      "price": 42,
+      "img": "yumipaigutang",
+      "sales": 156,
+      "featured": true,
+      "sort": 2
+    },
+    {
+      "id": "d303",
+      "cat": "c3",
+      "name": "香菇鸡汤",
+      "desc": "香菇提鲜，汤清味醇",
+      "price": 38,
+      "img": "xianggujitang",
+      "sales": 98,
+      "featured": false,
+      "sort": 3
+    },
+    {
+      "id": "d401",
+      "cat": "c4",
+      "name": "米饭",
+      "desc": "东北大米现蒸，粒粒分明",
+      "price": 3,
+      "img": "mifan",
+      "sales": 1024,
+      "featured": false,
+      "sort": 1
+    },
+    {
+      "id": "d402",
+      "cat": "c4",
+      "name": "蛋炒饭",
+      "desc": "颗粒分明，蛋香浓郁",
+      "price": 15,
+      "img": "danchaofan",
+      "sales": 458,
+      "featured": true,
+      "sort": 2
+    },
+    {
+      "id": "d403",
+      "cat": "c4",
+      "name": "葱油拌面",
+      "desc": "葱香扑鼻，劲道爽滑",
+      "price": 14,
+      "img": "congyoubanmian",
+      "sales": 176,
+      "featured": false,
+      "sort": 3
+    },
+    {
+      "id": "d501",
+      "cat": "c5",
+      "name": "鲜榨西瓜汁",
+      "desc": "当日鲜榨，清凉解暑",
+      "price": 12,
+      "img": "xiguazhi",
+      "sales": 289,
+      "featured": false,
+      "sort": 1
+    },
+    {
+      "id": "d502",
+      "cat": "c5",
+      "name": "红豆沙小圆子",
+      "desc": "软糯香甜，温热暖心",
+      "price": 14,
+      "img": "hongshayuanzi",
+      "sales": 143,
+      "featured": false,
+      "sort": 2
+    },
+    {
+      "id": "d503",
+      "cat": "c5",
+      "name": "鲜榨玉米汁",
+      "desc": "现榨慢煮，香浓顺滑",
+      "price": 12,
+      "img": "yumizhi",
+      "sales": 167,
+      "featured": false,
+      "sort": 3
+    }
+  ]
+}
