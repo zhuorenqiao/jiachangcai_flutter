@@ -1,17 +1,25 @@
 import 'package:flutter/material.dart';
 
 import '../data/app_store.dart';
+import '../models/models.dart';
+import '../widgets/cart_sheet.dart';
 import '../widgets/common.dart';
 
 Future<void> openDish(
   BuildContext context,
   AppStore store,
   String id,
-  VoidCallback onCart,
-) => Navigator.push(
+  VoidCallback onCart, {
+  VoidCallback? onMenu,
+}) => Navigator.push(
   context,
   MaterialPageRoute<void>(
-    builder: (_) => DishScreen(store: store, id: id, onCart: onCart),
+    builder: (_) => DishScreen(
+      store: store,
+      id: id,
+      onCart: onCart,
+      onMenu: onMenu,
+    ),
   ),
 );
 
@@ -19,11 +27,15 @@ class DishScreen extends StatelessWidget {
   final AppStore store;
   final String id;
   final VoidCallback onCart;
+  /// Brings the user to the 点餐 tab. Left null when the menu tab is already
+  /// the page underneath, where simply leaving this page gets them there.
+  final VoidCallback? onMenu;
   const DishScreen({
     super.key,
     required this.store,
     required this.id,
     required this.onCart,
+    this.onMenu,
   });
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -69,11 +81,25 @@ class DishScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (dish.featured)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 10),
-                      child: Text('招牌推荐', style: TextStyle(color: accent)),
+                  const SizedBox(height: 10),
+                  // One line under the 月售 row: 招牌推荐 on the left when the
+                  // dish has it, the add action on the right. The fixed height
+                  // stops the card from twitching when the 40dp button swaps
+                  // for the 30dp stepper.
+                  SizedBox(
+                    height: 40,
+                    child: Row(
+                      children: [
+                        if (dish.featured)
+                          const Text(
+                            '招牌推荐',
+                            style: TextStyle(color: accent),
+                          ),
+                        const Spacer(),
+                        _DetailAddAction(store: store, dish: dish, id: id),
+                      ],
                     ),
+                  ),
                 ],
               ),
             ),
@@ -100,9 +126,19 @@ class DishScreen extends StatelessWidget {
               children: [
                 IconButton(
                   tooltip: '查看购物车',
-                  onPressed: () {
+                  onPressed: () async {
+                    // The cart opens as a sheet over this page instead of
+                    // replacing it, so the dish stays in view while the order
+                    // is being tweaked. Only after the sheet is gone does the
+                    // page itself get left behind.
+                    final action = await showCartSheet(context, store);
+                    if (action == null || !context.mounted) return;
                     Navigator.pop(context);
-                    onCart();
+                    if (action == CartSheetAction.checkout) {
+                      onCart();
+                    } else {
+                      onMenu?.call();
+                    }
                   },
                   icon: CartTarget(
                     child: Badge(
@@ -113,36 +149,6 @@ class DishScreen extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                FilledButton(
-                  onPressed: dish.available
-                      ? () async {
-                          // Match the list stepper: only the first add
-                          // (0 -> 1) flies the ball into the cart.
-                          if (store.quantity(id) == 0) {
-                            final box =
-                                context.findRenderObject() as RenderBox?;
-                            if (box != null && box.hasSize) {
-                              flyToCart(
-                                context,
-                                box.localToGlobal(
-                                  Offset(
-                                    box.size.width - 40,
-                                    box.size.height / 2,
-                                  ),
-                                ),
-                              );
-                            }
-                          }
-                          await perform(
-                            context,
-                            () => store.setQuantity(id, store.quantity(id) + 1),
-                          );
-                          if (context.mounted) toast(context, '已加入购物车');
-                        }
-                      : null,
-                  child: Text(dish.available ? '加入购物车' : '已下架'),
-                ),
-                const SizedBox(width: 8),
                 FilledButton(
                   onPressed: dish.available
                       ? () => perform(context, () async {
@@ -164,6 +170,51 @@ class DishScreen extends StatelessWidget {
       );
     },
   );
+}
+
+/// The detail page's add action, living inside the price card: a button while
+/// the dish is not in the cart yet, and the same [QuantityStepper] the menu
+/// list uses once it is, so the quantity can go up and down in place.
+class _DetailAddAction extends StatelessWidget {
+  final AppStore store;
+  final Dish dish;
+  final String id;
+  const _DetailAddAction({
+    required this.store,
+    required this.dish,
+    required this.id,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!dish.available) {
+      return const FilledButton(onPressed: null, child: Text('已下架'));
+    }
+    if (store.quantity(id) > 0) {
+      // The 0 -> 1 flight already happened on the button, so adds from here
+      // just change the number.
+      return QuantityStepper(store, id, fly: false);
+    }
+    return Builder(
+      builder: (buttonContext) => FilledButton(
+        onPressed: () async {
+          // Measured up front: once the quantity lands the button is replaced
+          // by the stepper, so there is nothing left to measure afterwards.
+          final box = buttonContext.findRenderObject() as RenderBox?;
+          final start = (box != null && box.hasSize)
+              ? box.localToGlobal(box.size.center(Offset.zero))
+              : null;
+          final ok = await perform(context, () => store.setQuantity(id, 1));
+          // Only promise and animate once it actually happened; perform has
+          // already toasted the failure.
+          if (!ok || !context.mounted) return;
+          if (start != null) flyToCart(context, start);
+          toast(context, '已加入购物车');
+        },
+        child: const Text('加入购物车'),
+      ),
+    );
+  }
 }
 
 /// Fullscreen photo viewer: black backdrop, pinch-zoom and drag via

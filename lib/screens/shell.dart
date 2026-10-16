@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../data/app_store.dart';
 import '../models/models.dart';
+import '../widgets/cart_sheet.dart';
 import '../widgets/common.dart';
 import 'dish_screen.dart';
 import 'order_screens.dart';
@@ -287,7 +288,13 @@ class HomeTab extends StatelessWidget {
           Section(
             padding: EdgeInsets.zero,
             child: InkWell(
-              onTap: () => openDish(context, store, top.id, onCart),
+              onTap: () => openDish(
+                context,
+                store,
+                top.id,
+                onCart,
+                onMenu: () => onMenu(top.categoryId),
+              ),
               child: Row(
                 children: [
                   FoodImage(top.image, width: 120, height: 158, radius: 8),
@@ -411,7 +418,13 @@ class HomeTab extends StatelessWidget {
                   itemBuilder: (context, i) {
                     final d = featured[i + 1];
                     return InkWell(
-                      onTap: () => openDish(context, store, d.id, onCart),
+                      onTap: () => openDish(
+                        context,
+                        store,
+                        d.id,
+                        onCart,
+                        onMenu: () => onMenu(d.categoryId),
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -659,7 +672,19 @@ class _MenuTabState extends State<MenuTab> {
           ],
         ),
       ),
-      CartSummary(store: widget.store, label: '去结算', onTap: widget.onCart),
+      CartSummary(
+        store: widget.store,
+        label: '去结算',
+        onTap: widget.onCart,
+        // The settlement row is this page's cart icon: added dishes fly here
+        // rather than to the bottom bar, and tapping it opens the cart as a
+        // sheet so the menu stays in view. 去结算 still jumps to the cart tab.
+        target: true,
+        onIconTap: () async {
+          final action = await showCartSheet(context, widget.store);
+          if (action == CartSheetAction.checkout && mounted) widget.onCart();
+        },
+      ),
     ],
   );
 }
@@ -733,45 +758,6 @@ class DishListTile extends StatelessWidget {
   );
 }
 
-class CartSummary extends StatelessWidget {
-  final AppStore store;
-  final String label;
-  final VoidCallback? onTap;
-  const CartSummary({
-    super.key,
-    required this.store,
-    required this.label,
-    required this.onTap,
-  });
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-    color: Colors.white,
-    child: Row(
-      children: [
-        const Icon(Icons.shopping_bag_outlined, color: accent),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Price(store.cartTotal),
-              Text(
-                '已选 ${store.cartCount} 份',
-                style: const TextStyle(color: muted, fontSize: 11),
-              ),
-            ],
-          ),
-        ),
-        FilledButton(
-          onPressed: store.cartCount > 0 ? onTap : null,
-          child: Text(label),
-        ),
-      ],
-    ),
-  );
-}
-
 class CartTab extends StatefulWidget {
   final AppStore store;
   final VoidCallback onMenu, onOrders;
@@ -833,52 +819,7 @@ class _CartTabState extends State<CartTab> {
               ? EmptyView('购物车还是空的', onMenu: widget.onMenu)
               : ListView(
                   children: [
-                    Section(
-                      child: Column(
-                        children: [
-                          SectionTitle(
-                            '已选菜品',
-                            action: '清空',
-                            onTap: () async {
-                              if (await confirm(
-                                    context,
-                                    '清空购物车',
-                                    '确定要清空购物车吗？',
-                                  ) &&
-                                  context.mounted) {
-                                await perform(context, store.clearCart);
-                              }
-                            },
-                          ),
-                          for (final item in store.cartItems)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              child: Row(
-                                children: [
-                                  FoodImage(item.image, width: 64, height: 64),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          item.name,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Price(item.price, size: 15),
-                                      ],
-                                    ),
-                                  ),
-                                  QuantityStepper(store, item.id, fly: false),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
+                    CartDishList(store: store),
                     Section(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

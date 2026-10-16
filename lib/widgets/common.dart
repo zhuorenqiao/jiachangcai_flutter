@@ -18,9 +18,15 @@ void toast(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 }
 
-Future<void> perform(BuildContext context, Future<void> Function() work) async {
+/// Runs [work], turning any failure into a toast. Tells the caller whether it
+/// succeeded, so a promise like "已加入购物车" is only made once it is true.
+Future<bool> perform(
+  BuildContext context,
+  Future<void> Function() work,
+) async {
   try {
     await work();
+    return true;
   } catch (e) {
     if (context.mounted) {
       toast(
@@ -28,6 +34,7 @@ Future<void> perform(BuildContext context, Future<void> Function() work) async {
         e.toString().replaceFirst(RegExp(r'^\w+(Exception|Error)?:\s*'), ''),
       );
     }
+    return false;
   }
 }
 
@@ -172,16 +179,98 @@ class Price extends StatelessWidget {
   );
 }
 
+/// The live cart bar: total, portion count and the action that moves the user
+/// on. Used by the menu tab, the cart tab and the bottom of the cart sheet.
+/// When [onIconTap] is set the leading cart icon becomes a button that reveals
+/// the cart (the menu list opens it as a sheet); when [target] is set the icon
+/// also registers as a priority fly-to-cart landing spot for this screen.
+class CartSummary extends StatelessWidget {
+  final AppStore store;
+  final String label;
+  final VoidCallback? onTap;
+  final VoidCallback? onIconTap;
+  final bool target;
+  const CartSummary({
+    super.key,
+    required this.store,
+    required this.label,
+    required this.onTap,
+    this.onIconTap,
+    this.target = false,
+  });
+  @override
+  Widget build(BuildContext context) {
+    Widget icon = const Icon(Icons.shopping_bag_outlined, color: accent);
+    if (target) icon = CartTarget(priority: true, child: icon);
+    if (onIconTap != null) {
+      icon = Semantics(
+        button: true,
+        label: '查看购物车',
+        child: InkWell(
+          onTap: onIconTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(padding: const EdgeInsets.all(4), child: icon),
+        ),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      color: Colors.white,
+      child: Row(
+        children: [
+          icon,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Price(store.cartTotal),
+                Text(
+                  '已选 ${store.cartCount} 份',
+                  style: const TextStyle(color: muted, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          FilledButton(
+            onPressed: store.cartCount > 0 ? onTap : null,
+            child: Text(label),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Registered cart icons, innermost (most recently mounted) first used.
-/// The shell's bottom-bar icon registers at startup; the dish detail page
-/// registers its own while pushed, so balls fly to the icon the user sees.
+/// The shell's bottom-bar icon registers at startup; the menu settlement row
+/// and the dish detail page register prioritised icons while visible, so balls
+/// fly to the cart icon the user is actually looking at.
 final List<CartTargetState> _cartTargets = [];
 
-CartTargetState? get _visibleCartTarget {
+/// Picks where a fly ball lands: the most recently mounted cart icon that is
+/// genuinely on screen. A [CartTarget.priority] icon (the settlement row on the
+/// menu, the detail page) wins over the always-on bottom navigation bar, which
+/// is only used as a fallback when no prioritised icon is visible. Pages the
+/// pager has scrolled off-screen report a centre outside the viewport, so they
+/// are skipped rather than stealing a ball from the tab the user is on.
+CartTargetState? _visibleCartTarget(Size screen) {
+  CartTargetState? fallback;
   for (final target in _cartTargets.reversed) {
-    if (target.mounted) return target;
+    if (!target.mounted) continue;
+    final box = target.context.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached || !box.hasSize) continue;
+    final center = box.localToGlobal(box.size.center(Offset.zero));
+    final onScreen =
+        center.dx >= 0 &&
+        center.dy >= 0 &&
+        center.dx <= screen.width &&
+        center.dy <= screen.height;
+    if (!onScreen) continue;
+    if (target.priority) return target;
+    fallback ??= target;
   }
-  return null;
+  return fallback;
 }
 
 /// Plays the mini-program style fly-to-cart animation: a small ball leaves
@@ -189,7 +278,7 @@ CartTargetState? get _visibleCartTarget {
 /// above both endpoints, and lands on the visible cart icon, which then
 /// pulses. Safe no-op when no cart icon is currently mounted.
 void flyToCart(BuildContext context, Offset start) {
-  final target = _visibleCartTarget;
+  final target = _visibleCartTarget(MediaQuery.sizeOf(context));
   if (target == null) return;
   final box = target.context.findRenderObject() as RenderBox?;
   if (box == null || !box.attached || !box.hasSize) return;
@@ -214,13 +303,21 @@ final GlobalKey flyBallKey = GlobalKey();
 /// Wraps a cart icon so it can pulse when a fly-to-cart ball lands on it.
 class CartTarget extends StatefulWidget {
   final Widget child;
-  const CartTarget({super.key, required this.child});
+  final bool priority;
+  const CartTarget({
+    super.key,
+    required this.child,
+    this.priority = false,
+  });
   @override
   State<CartTarget> createState() => CartTargetState();
 }
 
 class CartTargetState extends State<CartTarget>
     with SingleTickerProviderStateMixin {
+  /// Whether a visible fly ball should prefer this icon over the bottom bar.
+  bool get priority => widget.priority;
+
   late final AnimationController controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 300),

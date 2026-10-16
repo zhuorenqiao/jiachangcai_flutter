@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jiachangcai_flutter/data/app_store.dart';
 import 'package:jiachangcai_flutter/main.dart';
+import 'package:jiachangcai_flutter/screens/dish_screen.dart';
 import 'package:jiachangcai_flutter/screens/shell.dart';
 import 'package:jiachangcai_flutter/widgets/common.dart';
 
@@ -387,7 +388,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(store.cartCount, 2);
   });
-  // The dish detail page must follow the same rule as the list stepper.
+  // The detail page adds from inside the price card, under the 月售 line, and
+  // hands that slot to the shared stepper while a quantity is in the cart.
   testWidgets('detail add flies a ball only on the first add', (tester) async {
     tester.view.physicalSize = const Size(375, 812);
     tester.view.devicePixelRatio = 1;
@@ -399,24 +401,334 @@ void main() {
     await store.login();
     await tester.pumpWidget(RestaurantApp(store: store));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('全部菜品'));
+    // Enter through the home page's "去看看" so the dish is guaranteed to be a
+    // featured one, which is what renders the 招牌推荐 tag.
+    await tester.tap(find.text('去看看'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DishListTile).first);
-    await tester.pumpAndSettle();
-    expect(find.text('加入购物车'), findsOneWidget);
-    await tester.tap(find.text('加入购物车'));
+    final detail = find.byType(DishScreen);
+    final add = find.descendant(of: detail, matching: find.text('加入购物车'));
+    final stepper = find.descendant(
+      of: detail,
+      matching: find.byType(QuantityStepper),
+    );
+    expect(add, findsOneWidget);
+    expect(stepper, findsNothing);
+    // It really lives under the 月售 line, sharing its right edge — not down
+    // in the bottom bar any more. Measure the button itself, not its label,
+    // which is inset by the button's own padding.
+    final addButton = find.ancestor(of: add, matching: find.byType(FilledButton));
+    final sales = find.descendant(
+      of: detail,
+      matching: find.textContaining('月售'),
+    );
+    final rightEdge = tester.getRect(addButton).right;
+    expect(
+      tester.getRect(addButton).top,
+      greaterThan(tester.getRect(sales).bottom),
+      reason: 'the add button must sit below the 月售 line',
+    );
+    expect(
+      rightEdge,
+      tester.getRect(sales).right,
+      reason: 'the add button must share the 月售 line\'s right edge',
+    );
+    // The 招牌推荐 tag and the add button share one line, tag left and button
+    // right, instead of stacking into two rows.
+    final tag = find.descendant(of: detail, matching: find.text('招牌推荐'));
+    expect(tag, findsOneWidget);
+    expect(
+      tester.getRect(tag).center.dy,
+      closeTo(tester.getRect(addButton).center.dy, 1),
+      reason: 'the 招牌推荐 tag and the add button must sit on the same line',
+    );
+    expect(
+      tester.getRect(tag).right,
+      lessThan(tester.getRect(addButton).left),
+      reason: 'the tag must stay clear of the button on its left',
+    );
+    await tester.tap(add);
     await tester.pump(const Duration(milliseconds: 250));
     expect(find.byKey(flyBallKey), findsOneWidget,
         reason: 'the first add on the detail page should fly a ball');
     await tester.pumpAndSettle();
     expect(store.cartCount, 1);
-    // Second add: no ball.
-    await tester.tap(find.text('加入购物车'));
+    // The button gives its own slot to the stepper, which shows the quantity
+    // and keeps the same right edge, so the card doesn't jump on swap.
+    expect(add, findsNothing);
+    expect(stepper, findsOneWidget);
+    expect(tester.getRect(stepper).right, rightEdge,
+        reason: 'the stepper must take over the button without shifting it');
+    expect(
+      find.descendant(of: stepper, matching: find.text('1')),
+      findsOneWidget,
+    );
+    // Second add goes through the stepper and must not fly a ball.
+    await tester.tap(
+      find.descendant(of: stepper, matching: find.byIcon(Icons.add)),
+    );
     await tester.pump(const Duration(milliseconds: 250));
     expect(find.byKey(flyBallKey), findsNothing,
         reason: 'later adds on the detail page should not fly a ball');
     await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
     expect(store.cartCount, 2);
+    // Reducing back to zero brings the button and the stepper's number away.
+    for (var i = 0; i < 2; i++) {
+      await tester.tap(
+        find.descendant(of: stepper, matching: find.byIcon(Icons.remove)),
+      );
+      await tester.pumpAndSettle();
+    }
+    expect(store.cartCount, 0);
+    expect(stepper, findsNothing);
+    expect(add, findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  // The detail page's cart icon must reveal the selected dishes in a sheet
+  // rising from the bottom, without ever leaving the page.
+  testWidgets('detail cart icon opens a cart sheet instead of the cart tab', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(375, 812);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    SharedPreferences.setMockInitialValues({});
+    final store = AppStore(await SharedPreferences.getInstance());
+    await store.initialize(seedJson: seedJson);
+    await store.login();
+    await tester.pumpWidget(RestaurantApp(store: store));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('去看看'));
+    await tester.pumpAndSettle();
+    final cartIcon = find.byTooltip('查看购物车');
+    // Empty cart: a sheet with an empty state, not the cart page.
+    await tester.tap(cartIcon);
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.text('购物车还是空的'), findsOneWidget);
+    expect(find.text('提交订单'), findsNothing);
+    expect(find.byType(DishScreen), findsOneWidget);
+    // "去点餐" closes the sheet, leaves the detail page and lands on the
+    // 点餐 tab, which is what the button promises.
+    await tester.tap(find.text('去点餐'));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.byType(DishScreen), findsNothing);
+    // Pin the tab by what only the menu page has: dish tiles, and no 本店分类
+    // card. ('全部菜品' is useless here — it is the home page's own "see all"
+    // link, not a menu label.)
+    expect(find.byType(DishListTile), findsWidgets);
+    expect(find.text('本店分类'), findsNothing);
+    // Back to the home page and in again, this time with a dish in the cart.
+    await tester.tap(find.text('首页'));
+    await tester.pumpAndSettle();
+    expect(find.text('本店分类'), findsOneWidget);
+    await tester.tap(find.text('去看看'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('加入购物车'));
+    await tester.pumpAndSettle();
+    expect(store.cartCount, 1);
+    await tester.tap(cartIcon);
+    await tester.pumpAndSettle();
+    final sheet = find.byType(BottomSheet);
+    expect(sheet, findsOneWidget);
+    expect(find.descendant(of: sheet, matching: find.text('已选菜品')), findsOneWidget);
+    expect(find.descendant(of: sheet, matching: find.text('清空')), findsOneWidget);
+    expect(
+      find.descendant(of: sheet, matching: find.text('去结算')),
+      findsOneWidget,
+    );
+    final sheetStepper = find.descendant(
+      of: sheet,
+      matching: find.byType(QuantityStepper),
+    );
+    expect(sheetStepper, findsOneWidget);
+    await tester.tap(
+      find.descendant(of: sheetStepper, matching: find.byIcon(Icons.add)),
+    );
+    await tester.pumpAndSettle();
+    expect(store.cartCount, 2);
+    // The sheet stays open and follows the live cart.
+    expect(sheet, findsOneWidget);
+    // "去结算" drops the sheet and the detail page and lands on the cart tab.
+    await tester.tap(find.descendant(of: sheet, matching: find.text('去结算')));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.byType(DishScreen), findsNothing);
+    expect(find.text('提交订单'), findsOneWidget);
+    expect(store.cartCount, 2);
+    expect(tester.takeException(), isNull);
+  });
+
+  // Clearing from inside the sheet empties the cart and drops the sheet, so
+  // the user lands back on the dish they were reading. The cart tab, which
+  // shares the same list, has nothing to close and must keep working.
+  testWidgets('clearing the cart inside the sheet closes the sheet', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(375, 812);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    SharedPreferences.setMockInitialValues({});
+    final store = AppStore(await SharedPreferences.getInstance());
+    await store.initialize(seedJson: seedJson);
+    await store.login();
+    await tester.pumpWidget(RestaurantApp(store: store));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('去看看'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('加入购物车'));
+    await tester.pumpAndSettle();
+    expect(store.cartCount, 1);
+    await tester.tap(find.byTooltip('查看购物车'));
+    await tester.pumpAndSettle();
+    final sheet = find.byType(BottomSheet);
+    expect(sheet, findsOneWidget);
+    await tester.tap(find.descendant(of: sheet, matching: find.text('清空')));
+    await tester.pumpAndSettle();
+    // Still a two-step delete: the confirm dialog has to be accepted first.
+    expect(find.text('确定'), findsOneWidget);
+    expect(store.cartCount, 1);
+    await tester.tap(find.text('确定'));
+    // The sheet is already on its way out, so the cart change behind it must
+    // not repaint the exit animation into an empty state.
+    await tester.pump();
+    expect(find.text('已选菜品'), findsOneWidget);
+    expect(find.text('购物车还是空的'), findsNothing);
+    await tester.pumpAndSettle();
+    expect(store.cartCount, 0);
+    expect(sheet, findsNothing);
+    expect(find.byType(DishScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  // Dismissing the sheet by hand is the one path that must leave everything
+  // where it was: no page pop, no cart change.
+  testWidgets('dismissing the cart sheet keeps the detail page and cart', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(375, 812);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    SharedPreferences.setMockInitialValues({});
+    final store = AppStore(await SharedPreferences.getInstance());
+    await store.initialize(seedJson: seedJson);
+    await store.login();
+    await tester.pumpWidget(RestaurantApp(store: store));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('去看看'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('加入购物车'));
+    await tester.pumpAndSettle();
+    expect(store.cartCount, 1);
+    await tester.tap(find.byTooltip('查看购物车'));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsOneWidget);
+    // Swipe the sheet away on the scrim instead of using a button.
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.byType(DishScreen), findsOneWidget);
+    expect(find.text('提交订单'), findsNothing);
+    expect(store.cartCount, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  // The add button only says "已加入购物车" when perform reports success, so
+  // that verdict has to be trustworthy. The app has no seam to make a real save
+  // fail in a test, so the contract itself is tested here.
+  testWidgets('perform tells the caller whether the work succeeded', (
+    tester,
+  ) async {
+    String? verdict;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () async {
+                final bad = await perform(
+                  context,
+                  () async => throw StateError('boom'),
+                );
+                final good = await perform(context, () async {});
+                verdict = '$bad/$good';
+              },
+              child: const Text('go'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+    expect(verdict, 'false/true');
+    // The failure was surfaced, not swallowed silently. StateError prints as
+    // "Bad state: boom" and perform's prefix strip only handles single words.
+    expect(find.textContaining('boom'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  // The menu's settlement row is the page's own cart icon: tapping it opens the
+  // cart as a sheet over the list (rather than jumping to the cart tab), and it
+  // registers as a prioritised fly-to-cart landing spot.
+  testWidgets('menu settlement row: cart icon opens a sheet and is the fly target', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(375, 812);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    SharedPreferences.setMockInitialValues({});
+    final store = AppStore(await SharedPreferences.getInstance());
+    await store.initialize(seedJson: seedJson);
+    await store.login();
+    await pumpShell(tester, store);
+
+    // Go to the 点餐 tab and reach the settlement row through the menu.
+    await tester.tap(navLabel('点餐'));
+    await tester.pumpAndSettle();
+    expect(find.byType(MenuTab), findsOneWidget);
+
+    // The settlement row registers a prioritised CartTarget, while the bottom
+    // bar icons stay non-prioritised, so balls land on the visible row.
+    final menuTargets = tester
+        .widgetList<CartTarget>(
+          find.descendant(of: find.byType(MenuTab), matching: find.byType(CartTarget)),
+        )
+        .toList();
+    expect(menuTargets.any((t) => t.priority), isTrue,
+        reason: 'the settlement row should be a priority fly target');
+    final barTargets = tester
+        .widgetList<CartTarget>(
+          find.descendant(of: find.byType(NavigationBar), matching: find.byType(CartTarget)),
+        )
+        .toList();
+    expect(barTargets.every((t) => !t.priority), isTrue,
+        reason: 'the bottom bar should never out-prioritise the row');
+
+    // Tapping the cart icon reveals the cart sheet without leaving the menu.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(MenuTab),
+        matching: find.byIcon(Icons.shopping_bag_outlined),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.text('购物车还是空的'), findsOneWidget);
+    expect(find.byType(MenuTab), findsOneWidget);
+    expect(pagerPage(tester), 1.0);
+
+    // The empty sheet's 去点餐 closes it and keeps the user on the menu tab.
+    await tester.tap(find.text('去点餐'));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.byType(MenuTab), findsOneWidget);
+    expect(pagerPage(tester), 1.0);
+    expect(tester.takeException(), isNull);
   });
 }
